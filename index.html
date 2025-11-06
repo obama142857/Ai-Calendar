@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 日历助手</title>
+    <style>
+        /* CSS Reset & Variables - Light Mode */
+        :root {
+            --primary-color: #4CAF50; /* Green */
+            --secondary-color: #2196F3; /* Blue */
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --light-text-color: #666;
+            --border-color: #ddd;
+            --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --success-color: #4CAF50;
+            --error-color: #F44336;
+            --warning-color: #FFC107;
+            --info-color: #2196F3;
+        }
+
+        /* Dark Mode Variables */
+        [data-theme="dark"] {
+            --background-color: #121212;
+            --card-background: #1e1e1e;
+            --text-color: #e0e0e0;
+            --light-text-color: #b0b0b0;
+            --border-color: #333;
+            --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #app {
+            background: linear-gradient(135deg, #e0f2f7 0%, #d1e5ed 100%);
+            border-radius: 18px;
+            box-shadow: var(--shadow-light);
+            width: 100%;
+            max-width: 900px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            animation: fadeIn 0.8s ease-out;
+            margin-top: 20px;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        [data-theme="dark"] #app {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Title Animation */
+        header h1 {
+            font-size: 2.8em;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            letter-spacing: 1px;
+            font-weight: 700;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header h1::before {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+            transform: translateX(-100%);
+            animation: shimmer 3s infinite ease-in-out;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        header h1 .letter {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(30px) rotateX(90deg);
+            animation: titleLetterIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        @keyframes titleLetterIn {
+            to {
+                opacity: 1;
+                transform: translateY(0) rotateX(0deg);
+            }
+        }
+
+        /* Theme Toggle Button */
+        #theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+            color: var(--text-color);
+            z-index: 10;
+        }
+
+        #theme-toggle:hover {
+            background-color: var(--card-background);
+        }
+
+        [data-theme="dark"] #theme-toggle {
+            color: var(--text-color);
+        }
+
+        /* Input Animation */
+        #notification-input {
+            position: relative;
+            width: 100%;
+            padding: 15px 15px 15px 15px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            resize: vertical;
+            min-height: 100px;
+            outline: none;
+            background: linear-gradient(var(--card-background), var(--card-background)) padding-box,
+                        linear-gradient(135deg, var(--primary-color), var(--secondary-color)) border-box;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: var(--shadow-light);
+            color: var(--text-color);
+        }
+
+        #notification-input:focus {
+            border-radius: 16px;
+            transform: scale(1.02);
+            box-shadow: 0 8px 32px rgba(76, 175, 80, 0.3), inset 0 2px 4px rgba(255,255,255,0.5);
+            background: linear-gradient(var(--card-background), var(--card-background)) padding-box,
+                        linear-gradient(135deg, var(--primary-color), var(--secondary-color)) border-box;
+        }
+
+        #notification-input::placeholder { color: var(--light-text-color); opacity: 0.8; transition: opacity 0.3s ease; }
+        #notification-input:focus::placeholder { opacity: 0; transform: translateY(-10px) scale(0.9); }
+
+        header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 5px;
+            display: inline-block;
+            transition: color 0.3s ease;
+        }
+
+        h2:hover { color: var(--primary-color); }
+
+        section {
+            background-color: var(--card-background);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-light);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+        }
+
+        section:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            outline: none;
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: #43A047;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(76, 175, 80, 0.4);
+        }
+
+        button:active { transform: translateY(0); box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3); }
+        button:disabled { background-color: #9E9E9E; cursor: not-allowed; transform: none; box-shadow: none; }
+        #add-event-btn { width: 100%; }
+        #refresh-events-btn { background-color: var(--secondary-color); box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3); }
+        #refresh-events-btn:hover { background-color: #1976D2; box-shadow: 0 6px 12px rgba(33, 150, 243, 0.4); }
+
+        #events-container {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
+
+        /* Event Card */
+        .event-card {
+            background-color: var(--card-background);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--shadow-light);
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            position: relative;
+            color: var(--text-color);
+        }
+
+        .event-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .event-card:hover { transform: translateY(-8px); box-shadow: var(--shadow-hover); }
+        .event-card:hover::before { opacity: 1; }
+        
+        /* Event State Differentiation */
+        .event-card.past { opacity: 0.7; filter: grayscale(50%); border-left: 5px solid #9E9E9E; }
+        .event-card.future { border-left: 5px solid var(--primary-color); }
+        .event-card.ongoing { 
+            border-left: 5px solid var(--secondary-color); 
+            animation: ongoing-glow 2.2s infinite ease-in-out;
+        }
+
+        @keyframes ongoing-glow {
+            0%, 100% { box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1), 0 0 5px rgba(33, 150, 243, 0.2); }
+            50% { box-shadow: 0 8px 24px rgba(33, 150, 243, 0.25), 0 0 20px rgba(33, 150, 243, 0.4); }
+        }
+
+        .event-card.removing { animation: fadeOutAndShrink 0.5s forwards ease-out; }
+        @keyframes fadeOutAndShrink { to { opacity: 0; transform: scale(0.8); } }
+
+        .event-card h3 { 
+            font-size: 1.4em; 
+            margin-bottom: 8px; 
+            color: var(--text-color); 
+            line-height: 1.2; 
+            word-break: break-word; 
+            font-weight: 800; 
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: relative;
+            padding-right: 70px;
+            box-sizing: border-box;
+            /* Cool divider: gradient underline */
+            padding-bottom: 8px;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color)) bottom / 100% 2px no-repeat;
+            border-bottom: 2px solid transparent;
+        }
+
+        .event-card.ongoing h3::before {
+            content: '进行中';
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            background: var(--secondary-color);
+            color: white;
+            font-size: 0.5em;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            animation: live-indicator-pulse 1.5s infinite ease-in-out;
+            z-index: 2;
+        }
+
+        @keyframes live-indicator-pulse {
+            0%, 100% {
+                transform: translateY(-50%) scale(1);
+                box-shadow: 0 0 4px rgba(33, 150, 243, 0.5);
+            }
+            50% {
+                transform: translateY(-50%) scale(1.08);
+                box-shadow: 0 0 10px rgba(33, 150, 243, 0.8);
+            }
+        }
+
+        .event-info { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .event-info-item { 
+            display: flex; 
+            align-items: flex-start; 
+            gap: 6px; 
+            font-size: 1.1em; 
+            color: var(--light-text-color); 
+            font-weight: bold; 
+            line-height: 1.6;
+        }
+        .event-info-item::before {
+            content: ''; 
+            width: 14px; 
+            height: 14px; 
+            flex-shrink: 0; 
+            border-radius: 50%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 9px; 
+            color: white;
+            margin-top: 7px;
+        }
+        .event-info-item.time::before { content: '🕐'; background: linear-gradient(135deg, var(--info-color), #64B5F6); }
+        .event-info-item.location::before { content: '📍'; background: linear-gradient(135deg, var(--warning-color), #FFCA28); }
+
+        /* Countdown Section */
+        .event-card .countdown {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            margin: 10px 0 8px 0; padding: 12px; border-radius: 10px; text-align: center;
+            transition: all 0.3s ease; border: 1px solid rgba(0,0,0,0.05); line-height: 1.2;
+            color: var(--text-color);
+        }
+        .countdown-primary { font-size: 1.6em; font-weight: 800; margin-bottom: 2px; }
+        .countdown-secondary { font-size: 0.85em; font-weight: 500; opacity: 0.8; }
+
+        /* Future Event Urgency */
+        .countdown.urgent-far { background: rgba(76, 175, 80, 0.1); color: var(--primary-color); }
+        .countdown.urgent-far .countdown-secondary { color: #388E3C; }
+        .countdown.urgent-medium { background: rgba(255, 193, 7, 0.1); color: #FFA000; }
+        .countdown.urgent-medium .countdown-secondary { color: #FFB300; }
+        .countdown.urgent-close { background: rgba(244, 67, 54, 0.1); color: var(--error-color); animation: none; }
+        .countdown.urgent-close .countdown-secondary { color: #E53935; }
+
+        /* --- START: MODIFIED/NEW CSS SECTION --- */
+        /* Default Ongoing State: Blue */
+        .event-card.ongoing .countdown { background: rgba(33, 150, 243, 0.1); color: var(--secondary-color); animation: none; }
+        .event-card.ongoing .countdown .countdown-secondary { color: #1976D2; }
+
+        /* NEW Ongoing Urgency: Medium (<= 7 days left) - Yellow */
+        .event-card.ongoing .countdown.ongoing-medium {
+            background: rgba(255, 193, 7, 0.1);
+            color: #FFA000;
+            animation: none; /* Override blue pulse */
+        }
+        .event-card.ongoing .countdown.ongoing-medium .countdown-secondary { color: #FFB300; }
+
+        /* NEW Ongoing Urgency: Close (<= 24 hours left) - Red */
+        .event-card.ongoing .countdown.ongoing-close {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--error-color);
+            animation: none; /* Use no pulse */
+        }
+        .event-card.ongoing .countdown.ongoing-close .countdown-secondary { color: #E53935; }
+        /* --- END: MODIFIED/NEW CSS SECTION --- */
+        
+        @keyframes urgent-pulse-blue {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4); }
+            50% { transform: scale(1.03); box-shadow: 0 0 15px 5px rgba(33, 150, 243, 0); }
+        }
+        
+        .event-card.past .countdown { background: rgba(158, 158, 158, 0.1); color: #757575; animation: none; }
+        .event-card.past .countdown-primary { font-size: 1.3em; }
+        .event-card.past .countdown-secondary { display: none; }
+
+        .event-card .description-wrapper {
+            max-height: 0; overflow: hidden; transition: max-height 0.5s ease-out, padding-top 0.5s ease-out;
+            margin-top: 10px; border-top: 1px dashed transparent; padding-top: 0; box-sizing: content-box;
+        }
+        .event-card .description-wrapper.expanded {
+            max-height: 500px; padding-top: 8px; border-top: 1px dashed var(--border-color);
+            transition: max-height 0.7s ease-in-out, padding-top 0.5s ease-out, border-top 0.5s ease-out;
+        }
+        .event-card .description-wrapper p { white-space: pre-wrap; color: var(--light-text-color); }
+
+        .event-actions { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
+        .copy-btn, .delete-btn { padding: 6px 12px; font-size: 0.85em; border-radius: 6px; gap: 4px; color: white; }
+        .copy-btn { background-color: var(--info-color); box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3); }
+        .copy-btn:hover { background-color: #1976D2; box-shadow: 0 4px 8px rgba(33, 150, 243, 0.4); }
+        .delete-btn { background-color: var(--error-color); box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3); }
+        .delete-btn:hover { background-color: #d32f2f; box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4); }
+        
+        #no-events-message { grid-column: 1 / -1; text-align: center; color: var(--light-text-color); font-size: 1.1em; padding: 30px; }
+
+        /* Notification Pop-up */
+        .notification-popup {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            opacity: 0; background-color: var(--success-color); color: white; padding: 15px 25px;
+            border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); z-index: 1000;
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            font-size: 1.1em; min-width: 250px; text-align: center; display: flex;
+            align-items: center; gap: 10px; white-space: pre-wrap;
+        }
+        .notification-popup.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .notification-popup.success { background-color: var(--success-color); }
+        .notification-popup.error { background-color: var(--error-color); }
+        .notification-popup.info { background-color: var(--info-color); }
+        .notification-popup.warning { background-color: var(--warning-color); }
+
+        /* Delete Confirmation Modal */
+        #delete-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); display: none; justify-content: center;
+            align-items: center; z-index: 2000; backdrop-filter: blur(5px);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        #delete-modal.show { display: flex; }
+        @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-content {
+            background: var(--card-background); border-radius: 20px; padding: 30px;
+            box-shadow: var(--shadow-hover); text-align: center; max-width: 400px; width: 90%;
+            transform: scale(0.8) rotateY(10deg);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.3s ease;
+            color: var(--text-color);
+        }
+        #delete-modal.show .modal-content { transform: scale(1) rotateY(0deg); }
+        .modal-icon { font-size: 4em; color: var(--error-color); margin-bottom: 15px; display: block; }
+        .modal-title { font-size: 1.5em; color: var(--text-color); margin-bottom: 10px; font-weight: 600; }
+        .modal-message { color: var(--light-text-color); margin-bottom: 25px; line-height: 1.5; }
+        .modal-buttons { display: flex; gap: 15px; justify-content: center; }
+        .modal-btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 1em; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .modal-btn.cancel { background: #f5f5f5; color: var(--light-text-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .modal-btn.cancel:hover { background: #e0e0e0; transform: translateY(-2px); }
+        [data-theme="dark"] .modal-btn.cancel { background: #333; color: var(--light-text-color); }
+        [data-theme="dark"] .modal-btn.cancel:hover { background: #444; }
+        .modal-btn.confirm { background: linear-gradient(135deg, var(--error-color), #d32f2f); color: white; box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3); }
+        .modal-btn.confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4); }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            body { padding: 15px; }
+            #app { padding: 20px; margin-top: 10px; }
+            header h1 { font-size: 2em; }
+            h2 { font-size: 1.5em; }
+            .event-card { padding: 15px; }
+            .event-card h3 { font-size: 1.3em; padding-right: 65px; }
+            .countdown-primary { font-size: 1.5em; }
+            #events-container { grid-template-columns: 1fr; }
+            .notification-popup { width: 90%; left: 5%; transform: translateX(0) translateY(-100px); font-size: 1em; }
+            .notification-popup.show { transform: translateX(0) translateY(0); }
+            #theme-toggle { top: 10px; right: 10px; width: 40px; height: 40px; font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header> 
+            <button id="theme-toggle" title="切换主题">🌙</button>
+            <h1 data-text="AI 日历助手">
+                <span class="letter">A</span><span class="letter">I</span><span class="letter"> </span><span class="letter">日</span><span class="letter">历</span><span class="letter"> </span><span class="letter">助</span><span class="letter">手</span>
+            </h1> 
+        </header>
+        <main>
+            <section id="add-event-section">
+                <h2>智能添加事件</h2>
+                <textarea id="notification-input" placeholder="输入您的自然语言描述，AI将为您创建事件。例如：下周三下午3点开会，地点：会议室A，讨论项目进度。或者：明天上午9点到10点，和张三在咖啡厅见个面。"></textarea>
+                <button id="add-event-btn">✨ 添加事件到日历</button>
+            </section>
+            <section id="event-list-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <h2>即将到来的事件</h2>
+                    <button id="refresh-events-btn">🔄 刷新事件列表</button>
+                </div>
+                <div id="events-container">
+                    <p id="no-events-message" style="display: none;">暂无事件，快去添加一个吧！</p>
+                </div>
+            </section>
+        </main>
+        <div id="notification-popup" class="notification-popup">
+            <span class="notification-icon"></span>
+            <span class="notification-content"></span>
+        </div>
+    </div>
+
+    <!-- Custom Delete Confirmation Modal -->
+    <div id="delete-modal">
+        <div class="modal-content">
+            <span class="modal-icon">🗑️</span>
+            <h3 class="modal-title">确认删除事件</h3>
+            <p class="modal-message">您确定要删除这个事件吗？此操作无法撤销。</p>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancel-delete">取消</button>
+                <button class="modal-btn confirm" id="confirm-delete">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://tmp.panjiale.cfd';
+        const notificationInput = document.getElementById('notification-input');
+        const addEventBtn = document.getElementById('add-event-btn');
+        const refreshEventsBtn = document.getElementById('refresh-events-btn');
+        const eventsContainer = document.getElementById('events-container');
+        const notificationPopup = document.getElementById('notification-popup');
+        const notificationContent = notificationPopup.querySelector('.notification-content');
+        const notificationIcon = notificationPopup.querySelector('.notification-icon');
+        const noEventsMessage = document.getElementById('no-events-message');
+
+        let countdownIntervals = {};
+        let pendingDeleteCard = null;
+        let pendingDeleteData = null;
+        let deleteModal, cancelDeleteBtn, confirmDeleteBtn;
+
+        // Theme Management
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+
+        function setTheme(theme) {
+            html.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            setTheme(theme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = html.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+
+        themeToggle.addEventListener('click', toggleTheme);
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+
+        function showNotification(message, type = 'info', duration = 3000) {
+            notificationContent.textContent = message;
+            notificationPopup.className = `notification-popup show ${type}`;
+            if (type === 'success') notificationIcon.textContent = '✅';
+            else if (type === 'error') notificationIcon.textContent = '❌';
+            else if (type === 'warning') notificationIcon.textContent = '⚠️';
+            else notificationIcon.textContent = '💡';
+            setTimeout(() => {
+                notificationPopup.classList.remove('show');
+            }, duration);
+        }
+
+        function formatEventTime(startDate, endDate) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const isSameDay = startDate.getFullYear() === endDate.getFullYear() &&
+                              startDate.getMonth() === endDate.getMonth() &&
+                              startDate.getDate() === endDate.getDate();
+
+            const formatTime = (date) => date.toLocaleTimeString('zh-CN', {
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+
+            const formatDatePart = (date) => {
+                const eventDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                if (eventDate.getTime() === today.getTime()) return '今天';
+                if (eventDate.getTime() === tomorrow.getTime()) return '明天';
+                return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+            };
+
+            const startPart = formatDatePart(startDate) + ' ' + formatTime(startDate);
+
+            if (isSameDay) {
+                return `${startPart} - ${formatTime(endDate)}`;
+            } else {
+                const endPart = formatDatePart(endDate) + ' ' + formatTime(endDate);
+                return `${startPart} - ${endPart}`;
+            }
+        }
+        
+        function updateCountdown(eventElement, eventData) {
+            const countdownDiv = eventElement.querySelector('.countdown');
+            if (!countdownDiv) return;
+
+            const now = new Date();
+            const start = new Date(eventData.start);
+            const end = new Date(eventData.end);
+
+            eventElement.classList.remove('future', 'ongoing', 'past');
+            // Clear all possible urgency classes
+            countdownDiv.classList.remove('urgent-far', 'urgent-medium', 'urgent-close', 'ongoing-medium', 'ongoing-close');
+
+            let primaryHtml = '';
+            let secondaryHtml = '';
+
+            if (now < start) {
+                eventElement.classList.add('future');
+                const diffMs = start.getTime() - now.getTime();
+                const diff = {
+                    days: Math.floor(diffMs / 86400000),
+                    hours: Math.floor((diffMs % 86400000) / 3600000),
+                    minutes: Math.floor((diffMs % 3600000) / 60000),
+                    seconds: Math.floor((diffMs % 60000) / 1000)
+                };
+                
+                if (diff.days >= 7) { // Using >= 7 for yellow to be consistent with ongoing logic
+                    countdownDiv.classList.add('urgent-far');
+                } else if (diffMs > 24 * 3600 * 1000) {
+                    countdownDiv.classList.add('urgent-medium');
+                } else {
+                    countdownDiv.classList.add('urgent-close');
+                }
+
+                if (diff.days > 0) {
+                    primaryHtml = `${diff.days} 天`;
+                    secondaryHtml = `${diff.hours} 时 ${diff.minutes} 分 ${diff.seconds} 秒`;
+                } else if (diff.hours > 0) {
+                    primaryHtml = `${diff.hours} 小时`;
+                    secondaryHtml = `${diff.minutes} 分 ${diff.seconds} 秒`;
+                } else if (diff.minutes > 0) {
+                    primaryHtml = `${diff.minutes} 分钟`;
+                    secondaryHtml = `${diff.seconds} 秒`;
+                } else {
+                    primaryHtml = `${diff.seconds} 秒`;
+                    secondaryHtml = `即将开始`;
+                }
+
+            } else if (now >= start && now < end) {
+                eventElement.classList.add('ongoing');
+                const diffMs = end.getTime() - now.getTime();
+                const diff = {
+                    days: Math.floor(diffMs / 86400000),
+                    hours: Math.floor((diffMs % 86400000) / 3600000),
+                    minutes: Math.floor((diffMs % 3600000) / 60000),
+                    seconds: Math.floor((diffMs % 60000) / 1000)
+                };
+                
+                // --- START: MODIFIED SECTION for Ongoing Event Urgency ---
+                const oneDayMs = 24 * 3600 * 1000;
+                const sevenDaysMs = 7 * oneDayMs;
+
+                if (diffMs <= oneDayMs) {
+                    countdownDiv.classList.add('ongoing-close'); // Red
+                } else if (diffMs <= sevenDaysMs) {
+                    countdownDiv.classList.add('ongoing-medium'); // Yellow
+                }
+                // Default is blue (handled by .event-card.ongoing .countdown in CSS)
+                // --- END: MODIFIED SECTION ---
+
+                if (diff.days > 0) {
+                    primaryHtml = `${diff.days} 天`;
+                    secondaryHtml = `${diff.hours} 时 ${diff.minutes} 分 ${diff.seconds} 秒`;
+                } else if (diff.hours > 0) {
+                    primaryHtml = `${diff.hours} 小时`;
+                    secondaryHtml = `${diff.minutes} 分 ${diff.seconds} 秒`;
+                } else if (diff.minutes > 0) {
+                    primaryHtml = `${diff.minutes} 分钟`;
+                    secondaryHtml = `${diff.seconds} 秒`;
+                } else {
+                    primaryHtml = `${diff.seconds} 秒`;
+                    secondaryHtml = `即将结束`;
+                }
+
+            } else {
+                eventElement.classList.add('past');
+                primaryHtml = `事件已结束`;
+                secondaryHtml = '';
+                const intervalKey = eventData.title + eventData.start;
+                if (countdownIntervals[intervalKey]) {
+                    clearInterval(countdownIntervals[intervalKey]);
+                    delete countdownIntervals[intervalKey];
+                }
+            }
+
+            countdownDiv.innerHTML = `
+                <div class="countdown-primary">${primaryHtml}</div>
+                <div class="countdown-secondary">${secondaryHtml}</div>
+            `;
+        }
+
+        async function copyEventInfo(e) {
+            e.stopPropagation();
+            const card = e.currentTarget.closest('.event-card');
+            const title = card.querySelector('h3').textContent;
+            const timeItem = card.querySelector('.time');
+            const locationItem = card.querySelector('.location');
+            const description = card.querySelector('.description-wrapper p').textContent;
+            const info = `${title.replace('进行中', '').trim()}\n${timeItem ? timeItem.textContent : ''}\n${locationItem ? locationItem.textContent : ''}\n\n描述:\n${description}`;
+            try {
+                await navigator.clipboard.writeText(info);
+                showNotification('事件信息已复制到剪贴板！', 'success');
+            } catch (err) {
+                console.error('复制失败:', err);
+                showNotification('复制失败，请手动复制。', 'error');
+            }
+        }
+
+        function showDeleteModal(card, data) {
+            pendingDeleteCard = card;
+            pendingDeleteData = data;
+            deleteModal.classList.add('show');
+        }
+
+        function hideDeleteModal() {
+            deleteModal.classList.remove('show');
+            pendingDeleteCard = null;
+            pendingDeleteData = null;
+        }
+        
+        function deleteEvent(e) {
+            e.stopPropagation();
+            const button = e.currentTarget;
+            const card = button.closest('.event-card');
+            const { title, start } = button.dataset;
+            const data = { title, start };
+            showDeleteModal(card, data);
+        }
+
+        function createEventCard(eventData) {
+            const eventCard = document.createElement('div');
+            eventCard.className = 'event-card';
+
+            const title = document.createElement('h3');
+            title.textContent = eventData.title;
+
+            const eventInfo = document.createElement('div');
+            eventInfo.className = 'event-info';
+
+            const timeItem = document.createElement('div');
+            timeItem.className = 'event-info-item time';
+            const startDate = new Date(eventData.start);
+            const endDate = new Date(eventData.end);
+            timeItem.textContent = formatEventTime(startDate, endDate);
+
+            const locationItem = document.createElement('div');
+            locationItem.className = 'event-info-item location';
+            locationItem.textContent = `${eventData.location || '未指定'}`;
+            eventInfo.append(timeItem, locationItem);
+
+            const countdown = document.createElement('div');
+            countdown.className = 'countdown';
+
+            const descriptionWrapper = document.createElement('div');
+            descriptionWrapper.className = 'description-wrapper';
+            const description = document.createElement('p');
+            description.textContent = eventData.description || '无详细描述';
+            descriptionWrapper.appendChild(description);
+            
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'event-actions';
+            
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.innerHTML = '📋 <span>复制</span>';
+            copyBtn.addEventListener('click', copyEventInfo);
+            actionsContainer.appendChild(copyBtn);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '🗑️ <span>删除</span>';
+            deleteBtn.dataset.title = eventData.title;
+            deleteBtn.dataset.start = eventData.start;
+            deleteBtn.addEventListener('click', deleteEvent);
+            actionsContainer.appendChild(deleteBtn);
+            
+            eventCard.append(title, eventInfo, countdown, descriptionWrapper, actionsContainer);
+
+            eventCard.addEventListener('click', (e) => {
+                if (e.target.closest('.delete-btn') || e.target.closest('.copy-btn')) return;
+                descriptionWrapper.classList.toggle('expanded');
+            });
+
+            updateCountdown(eventCard, eventData);
+            const intervalKey = eventData.title + eventData.start;
+            if (countdownIntervals[intervalKey]) clearInterval(countdownIntervals[intervalKey]);
+            countdownIntervals[intervalKey] = setInterval(() => updateCountdown(eventCard, eventData), 1000);
+
+            return eventCard;
+        }
+
+        async function fetchEvents() {
+            Object.values(countdownIntervals).forEach(clearInterval);
+            countdownIntervals = {};
+            
+            eventsContainer.innerHTML = '';
+            noEventsMessage.style.display = 'none';
+            const loadingP = document.createElement('p');
+            loadingP.textContent = '加载中...';
+            loadingP.style.textAlign = 'center';
+            loadingP.style.gridColumn = '1 / -1';
+            eventsContainer.appendChild(loadingP);
+
+            try {
+                const response = await fetch(`${BASE_URL}/get_events`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                
+                eventsContainer.innerHTML = '';
+
+                if (data.events && data.events.length > 0) {
+                    data.events.forEach(event => eventsContainer.appendChild(createEventCard(event)));
+                    noEventsMessage.style.display = 'none';
+                } else {
+                    noEventsMessage.style.display = 'block';
+                }
+                showNotification('事件列表已刷新！', 'success');
+            } catch (error) {
+                console.error('获取事件失败:', error);
+                eventsContainer.innerHTML = '<p style="color: var(--error-color); text-align: center; grid-column: 1 / -1;">加载事件失败，请稍后重试。</p>';
+                showNotification('获取事件失败，请检查网络或服务器！', 'error', 5000);
+            }
+        }
+
+        async function addEvent() {
+            const notificationText = notificationInput.value.trim();
+            if (!notificationText) return showNotification('请输入通知内容！', 'warning');
+
+            addEventBtn.disabled = true;
+            addEventBtn.textContent = '🧠 正在分析并添加...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/add_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notification: notificationText })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || '添加事件失败');
+                
+                showNotification('事件添加成功！', 'success');
+                notificationInput.value = '';
+                await fetchEvents();
+            } catch (error) {
+                console.error('添加事件失败:', error);
+                showNotification(`添加事件失败: ${error.message}`, 'error', 5000);
+            } finally {
+                addEventBtn.disabled = false;
+                addEventBtn.textContent = '✨ 添加事件到日历';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const letters = document.querySelectorAll('.letter');
+            letters.forEach((letter, index) => {
+                letter.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            initTheme();
+
+            deleteModal = document.getElementById('delete-modal');
+            cancelDeleteBtn = document.getElementById('cancel-delete');
+            confirmDeleteBtn = document.getElementById('confirm-delete');
+
+            cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+
+            confirmDeleteBtn.addEventListener('click', async () => {
+                if (!pendingDeleteData) return;
+                
+                const button = confirmDeleteBtn;
+                const card = pendingDeleteCard;
+
+                button.disabled = true;
+                button.textContent = '删除中...';
+
+                try {
+                    const response = await fetch(`${BASE_URL}/delete_event`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(pendingDeleteData)
+                    });
+                    const data = await response.json();
+                    if (!response.ok || data.error) throw new Error(data.error || '删除失败');
+                    
+                    showNotification('事件已成功删除', 'success');
+                    card.classList.add('removing');
+                    setTimeout(() => {
+                        card.remove();
+                        if (eventsContainer.children.length === 0) {
+                            noEventsMessage.style.display = 'block';
+                        }
+                    }, 500);
+                } catch (error) {
+                    console.error('删除事件失败:', error);
+                    showNotification(`删除失败: ${error.message}`, 'error', 5000);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = '删除';
+                    hideDeleteModal();
+                }
+            });
+            deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) hideDeleteModal(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && deleteModal.classList.contains('show')) hideDeleteModal(); });
+            fetchEvents();
+        });
+
+        addEventBtn.addEventListener('click', addEvent);
+        refreshEventsBtn.addEventListener('click', fetchEvents);
+        notificationInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault();
+                addEvent();
+            }
+        });
+    </script>
+</body>
+</html>
