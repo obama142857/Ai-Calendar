@@ -74,6 +74,16 @@ class DeleteEvent(BaseModel):
     start: str  # ISO8601 格式的开始时间
 
 
+class UpdateEvent(BaseModel):
+    old_title: str
+    old_start: str
+    title: str
+    start: str
+    end: str
+    location: str = ""
+    description: str = ""
+
+
 # ----------------------------------------------------------------------
 # 添加事件接口
 # ----------------------------------------------------------------------
@@ -227,6 +237,84 @@ async def delete_event(data: DeleteEvent):
         f.write("\n".join(lines) + "\n")
 
     return {"message": f"已删除 {len(events_to_remove)} 个事件"}
+
+
+# ----------------------------------------------------------------------
+# 编辑事件接口
+# ----------------------------------------------------------------------
+@app.post("/edit_event")
+async def edit_event(data: UpdateEvent):
+    old_title = data.old_title
+    old_start_str = data.old_start
+
+    # 解析旧的开始时间
+    try:
+        old_start_dt = datetime.fromisoformat(old_start_str)
+        if old_start_dt.tzinfo is None:
+            old_start_dt = tz.localize(old_start_dt)
+        else:
+            old_start_dt = old_start_dt.astimezone(tz)
+    except ValueError:
+        return {"error": "无效的旧开始时间格式", "value": old_start_str}
+
+    # 读取日历
+    with open(ICS_FILE, "r", encoding="utf-8") as f:
+        calendar = Calendar(f.read())
+
+    # 查找匹配的事件
+    target_event = None
+    for e in calendar.events:
+        if e.name == old_title and e.begin and e.begin == old_start_dt:
+            target_event = e
+            break
+
+    if not target_event:
+        print("未找到匹配的事件")
+        return {"error": "未找到匹配的事件"}
+
+    # 从日历中移除旧事件（因为修改属性可能改变哈希值）
+    calendar.events.remove(target_event)
+
+    # 更新事件属性
+    target_event.name = data.title
+
+    # 处理新的开始时间
+    try:
+        new_start_dt = datetime.fromisoformat(data.start)
+        if new_start_dt.tzinfo is None:
+            new_start_dt = tz.localize(new_start_dt)
+        else:
+            new_start_dt = new_start_dt.astimezone(tz)
+        target_event.begin = new_start_dt
+    except ValueError:
+        return {"error": "无效的新开始时间格式", "value": data.start}
+
+    # 处理新的结束时间
+    try:
+        new_end_dt = datetime.fromisoformat(data.end)
+        if new_end_dt.tzinfo is None:
+            new_end_dt = tz.localize(new_end_dt)
+        else:
+            new_end_dt = new_end_dt.astimezone(tz)
+        target_event.end = new_end_dt
+    except ValueError:
+        return {"error": "无效的新结束时间格式", "value": data.end}
+
+    target_event.location = data.location
+    target_event.description = data.description
+
+    # 将更新后的事件添加回日历
+    calendar.events.add(target_event)
+    
+
+    # 保存更新后的日历
+    lines = [line.rstrip()
+             for line in calendar.serialize_iter() if line.strip()]
+    with open(ICS_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+        print("事件已更新并保存")
+
+    return {"message": "事件已更新", "event": data}
 
 
 # ----------------------------------------------------------------------
